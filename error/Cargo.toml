@@ -1,0 +1,14 @@
+[package]
+name = "error"
+version = "0.1.0"
+authors = ["Abdelaziz Said <abdelazizsaid250@gmail.com>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-web = "3.3"
+diesel = { version = "1.4", features = ["postgres", "r2d2", "chrono", "uuidv07"] }
+paperclip = { version = "0.5.0", features = ["actix-nightly", "uuid", "chrono"] }
+serde = { version = "1.0", features = ["derive"] }
+validator = { version = "0.12", features = ["derive"] }
