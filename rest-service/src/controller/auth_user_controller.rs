@@ -100,7 +100,7 @@ pub async fn remove_all_auth_users_api(
     // Step 2: Delete all auth_users from the database.
     match delete_all_auth_users(&pg_connection) {
         Ok(deleted_auth_users) => {
-            // Step 3: Delete all members users, and teams from the databse.
+            // Step 3: Delete all members users, and teams from the database.
             if delete_all_members(&pg_connection).is_ok() {
                 // Step 4: Fire the response.
                 Ok(Json(SuccessResponse {

@@ -5,7 +5,6 @@ use actix_web::ResponseError;
 use diesel::result::Error as DieselError;
 use paperclip::actix::web::HttpResponse;
 use serde::{Deserialize, Serialize};
-use validator::{ValidationErrors, ValidationErrorsKind};
 
 #[derive(Debug)]
 pub enum Errors {
@@ -20,31 +19,6 @@ pub enum Errors {
 pub struct ErrorCode {
     pub error_code: String,
     pub message: String,
-}
-
-impl ErrorCode {
-    pub fn validate_errors(error: ValidationErrors, errors: &mut Vec<ErrorCode>) {
-        for value in error.errors().values() {
-            match value {
-                ValidationErrorsKind::Struct(_) => {}
-                ValidationErrorsKind::List(_) => {}
-                ValidationErrorsKind::Field(validation_error_vec) => {
-                    for validation_error in validation_error_vec {
-                        let error_code = validation_error.clone().code.to_string();
-                        let message = validation_error
-                            .clone()
-                            .message
-                            .expect("Validation Error")
-                            .to_string();
-                        errors.push(ErrorCode {
-                            error_code,
-                            message,
-                        });
-                    }
-                }
-            }
-        }
-    }
 }
 
 impl Display for Errors {

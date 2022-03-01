@@ -3,7 +3,6 @@ use paperclip::actix::{
     web::{self, Query},
 };
 use paperclip::actix::web::Json;
-use uuid::Uuid;
 
 use error::error::Errors;
 use error::error::StateCode::{DBError, PaginationError};

@@ -5,7 +5,6 @@ use error::error::Error;
 
 use crate::model::dto::PaginationDTO;
 use crate::model::member::{Member, Name, NewMember};
-use crate::model::team::TeamNames;
 use crate::schema::member::dsl::{expired_at, identity_num, member, modification_date, name, role};
 use crate::schema::member::dsl::id as member_id;
 use crate::util::utils::current_timestamp;
@@ -45,8 +44,8 @@ pub fn list_all_members(
     connection: &PgConnection,
 ) -> Result<Vec<Member>, Error> {
     member
-        .limit(pagination_dto.page_size)
-        .offset(pagination_dto.offset)
+        .limit(pagination_dto.page_size as i64)
+        .offset(pagination_dto.offset as i64)
         .load::<Member>(connection)
         .map_err(|err| Error::DBError(err))
 }
@@ -68,6 +67,7 @@ pub fn delete_member_by_id(other_member_id: &Uuid, connection: &PgConnection) ->
     }
 }
 
+// todo: // todo: need to return the list of deleted items to use it in the GraphQL like what I did in the auth_user engine
 pub fn delete_all_members(connection: &PgConnection) -> Result<usize, Error> {
     diesel::delete(member)
         .execute(connection)
@@ -84,7 +84,7 @@ pub fn find_member_by_id(
         .map_err(|err| Error::DBError(err))
 }
 
-pub fn update_auth_user(
+pub fn update_member(
     incoming_member: &Member,
     connection: &PgConnection,
 ) -> Result<Member, Error> {
@@ -116,6 +116,6 @@ pub fn get_all_member_names_by_team_id(
 ) -> Result<Vec<Name>, Error> {
     let query = format!("SELECT name FROM member WHERE team_id::text = '{}'", other_team_id);
     diesel::sql_query(query)
-        .load::<TeamNames>(connection)
+        .load::<Name>(connection)
         .map_err(|e| Error::DBError(e))
 }

@@ -3,6 +3,7 @@ pub mod engine;
 pub mod model;
 pub mod schema;
 pub mod util;
+pub mod context;
 
 
 #[macro_use]

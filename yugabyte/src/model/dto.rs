@@ -1,10 +1,11 @@
+use juniper::GraphQLInputObject;
 use paperclip::actix::Apiv2Schema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Deserialize, Apiv2Schema, Debug)]
+#[derive(Default, Deserialize, Apiv2Schema, GraphQLInputObject, Debug)]
 pub struct PaginationDTO {
-    pub page_size: i64,
-    pub offset: i64,
+    pub page_size: i32,
+    pub offset: i32,
 }
 
 #[derive(Default, Serialize, Apiv2Schema, Debug)]

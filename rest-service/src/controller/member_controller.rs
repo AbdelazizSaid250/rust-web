@@ -6,7 +6,7 @@ use paperclip::actix::{
 use paperclip::actix::web::Json;
 use uuid::Uuid;
 
-use error::error::{Error, Errors};
+use error::error::Errors;
 use error::error::StateCode::{DBError, NotFound, PaginationError};
 use yugabyte::db_connection::{CoreDBPool, pgdata_to_pgconnection};
 use yugabyte::engine::member::{count_members, delete_all_members, delete_member_by_id, filter_members_by_name, find_member_by_id, get_all_member_names_by_team_id, insert_bulk_members, list_all_members};

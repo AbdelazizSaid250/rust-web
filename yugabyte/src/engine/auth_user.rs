@@ -7,17 +7,17 @@ use error::error::Error;
 
 use crate::model::auth_user::AuthUser;
 use crate::model::dto::PaginationDTO;
-use crate::model::user::{NewUser, User};
+use crate::model::user::NewUser;
 use crate::schema::auth_user::dsl::auth_user;
 use crate::schema::auth_user::dsl::id as auth_user_id;
-use crate::schema::user::dsl::user;
 
 impl NewUser {
     pub fn add_auth_user(&self, connection: &PgConnection) -> Result<AuthUser, Error> {
+        // todo: don't forget to hash the password
         let initialized_auth_user = AuthUser {
             id: Uuid::new_v4(),
             email: self.email.clone(),
-            password: self.name.clone(),
+            password: self.password.clone(),
         };
         diesel::insert_into(auth_user)
             .values(&initialized_auth_user)
@@ -41,8 +41,8 @@ pub fn list_all_auth_users(
     connection: &PgConnection,
 ) -> Result<Vec<AuthUser>, Error> {
     auth_user
-        .limit(pagination_dto.page_size)
-        .offset(pagination_dto.offset)
+        .limit(pagination_dto.page_size as i64)
+        .offset(pagination_dto.offset as i64)
         .load::<AuthUser>(connection)
         .map_err(|err| Error::DBError(err))
 }
@@ -54,7 +54,7 @@ pub fn count_auth_users(connection: &PgConnection) -> Result<i64, Error> {
         .map_err(|e| Error::DBError(e))
 }
 
-
+// todo: need to return the deleted AuthUser to use it in the GraphQL
 pub fn delete_auth_user_by_id(other_auth_user_id: &Uuid, connection: &PgConnection) -> bool {
     match diesel::delete(
         auth_user.filter(auth_user_id.eq(other_auth_user_id))

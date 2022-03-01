@@ -1,7 +1,7 @@
 use actix_web::HttpResponse;
 use dotenv::dotenv;
 use paperclip::actix::web;
-use paperclip::actix::web::{post, resource, ServiceConfig};
+use paperclip::actix::web::ServiceConfig;
 use tracing_subscriber::EnvFilter;
 
 use crate::controller::auth_user_controller::{

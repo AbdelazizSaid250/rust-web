@@ -36,8 +36,8 @@ pub fn list_all_users(
     connection: &PgConnection,
 ) -> Result<Vec<User>, Error> {
     user
-        .limit(pagination_dto.page_size)
-        .offset(pagination_dto.offset)
+        .limit(pagination_dto.page_size as i64)
+        .offset(pagination_dto.offset as i64)
         .load::<User>(connection)
         .map_err(|err| Error::DBError(err))
 }
