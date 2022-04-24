@@ -3,13 +3,12 @@ use diesel::{Insertable, Queryable};
 use diesel::types::VarChar;
 use juniper::GraphQLInputObject;
 use juniper::GraphQLObject;
-use paperclip::actix::Apiv2Schema;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::schema::member;
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Clone, GraphQLObject, Apiv2Schema)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Clone, GraphQLObject)]
 #[table_name = "member"]
 pub struct Member {
     pub id: Uuid,
@@ -23,7 +22,20 @@ pub struct Member {
     pub modification_date: Option<NaiveDateTime>,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Apiv2Schema, GraphQLInputObject)]
+#[derive(GraphQLInputObject)]
+pub struct UpdateMember {
+    pub id: Uuid,
+    pub team_id: Uuid,
+    pub user_id: Uuid,
+    pub name: String,
+    pub identity_num: String,
+    pub role: String,
+    pub assigned_at: NaiveDateTime,
+    pub expired_at: Option<NaiveDateTime>,
+    pub modification_date: Option<NaiveDateTime>,
+}
+
+#[derive(Default, Debug, Serialize, Deserialize, GraphQLInputObject)]
 pub struct NewMember {
     pub team_id: Uuid,
     pub user_id: Uuid,

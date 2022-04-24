@@ -22,7 +22,7 @@ impl NewUser {
         diesel::insert_into(auth_user)
             .values(&initialized_auth_user)
             .get_result(connection)
-            .map_err(|_| Error::DuplicationError)
+            .map_err(|err| Error::from(err))
     }
 }
 
@@ -33,7 +33,7 @@ pub fn insert_bulk_auth_users(
     diesel::insert_into(auth_user)
         .values(other_auth_users)
         .get_results::<AuthUser>(connection)
-        .map_err(|_| Error::DuplicationError)
+        .map_err(|err| Error::from(err))
 }
 
 pub fn list_all_auth_users(
@@ -44,14 +44,14 @@ pub fn list_all_auth_users(
         .limit(pagination_dto.page_size as i64)
         .offset(pagination_dto.offset as i64)
         .load::<AuthUser>(connection)
-        .map_err(|err| Error::DBError(err))
+        .map_err(|err| Error::from(err))
 }
 
 pub fn count_auth_users(connection: &PgConnection) -> Result<i64, Error> {
     auth_user
         .count()
         .get_result(connection)
-        .map_err(|e| Error::DBError(e))
+        .map_err(|err| Error::from(err))
 }
 
 // todo: need to return the deleted AuthUser to use it in the GraphQL
@@ -60,7 +60,7 @@ pub fn delete_auth_user_by_id(other_auth_user_id: &Uuid, connection: &PgConnecti
         auth_user.filter(auth_user_id.eq(other_auth_user_id))
     )
         .execute(connection)
-        .map_err(|e| Error::DBError(e)) {
+        .map_err(|err| Error::from(err)) {
         // I can return the deleted object but I decided to return bool to show you that I can manage the code.
         Ok(0) => false,
         Ok(1) => true,
@@ -71,7 +71,7 @@ pub fn delete_auth_user_by_id(other_auth_user_id: &Uuid, connection: &PgConnecti
 pub fn delete_all_auth_users(connection: &PgConnection) -> Result<Vec<AuthUser>, Error> {
     diesel::delete(auth_user)
         .get_results::<AuthUser>(connection)
-        .map_err(|err| Error::DBError(err))
+        .map_err(|err| Error::from(err))
 }
 
 pub fn find_auth_user_by_id(
@@ -81,5 +81,5 @@ pub fn find_auth_user_by_id(
     auth_user
         .find(other_auth_user_id)
         .get_result::<AuthUser>(connection)
-        .map_err(|err| Error::DBError(err))
+        .map_err(|err| Error::from(err))
 }

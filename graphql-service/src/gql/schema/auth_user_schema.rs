@@ -1,4 +1,5 @@
 use diesel::pg::PgConnection;
+use juniper::{EmptySubscription, RootNode};
 use uuid::Uuid;
 
 use error::error::Error;
@@ -9,17 +10,14 @@ use yugabyte::engine::auth_user::{
 use yugabyte::model::auth_user::AuthUser;
 use yugabyte::model::dto::PaginationDTO;
 use yugabyte::model::user::NewUser;
-use juniper::{RootNode, EmptySubscription, GraphQLType, Registry, DefaultScalarValue};
-use juniper::meta::MetaType;
 
 pub struct Query;
 
 // The root Query struct depends on GraphQLContext to provide the connection pool
 // needed to execute the actual Postgres queries.
-#[juniper::graphql_object(Context = GraphQLContext)]
+#[juniper::graphql_object(context = GraphQLContext)]
 impl Query {
-    // I think the reason of error is that I need to change the Return type to FieldResult,
-    // and my engine function returns Result<Vec<AuthUser>, Error>
+    #[graphql(name = "allUsers")]
     pub fn list_auth_users(pagination_dto: PaginationDTO, context: &GraphQLContext) -> Result<Vec<AuthUser>, Error> {
         let pg_connection: &PgConnection = &context.pool.get().unwrap();
 
@@ -36,7 +34,7 @@ impl Query {
 
 pub struct Mutation;
 
-#[juniper::graphql_object(Context = GraphQLContext)]
+#[juniper::graphql_object(context = GraphQLContext)]
 impl Mutation {
     pub fn create_auth_user(
         context: &GraphQLContext,

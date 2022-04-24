@@ -1,25 +1,22 @@
-use paperclip::actix::{
-    api_v2_operation,
-    web::{self, Query},
-};
-use paperclip::actix::web::Json;
+use actix_web::web;
+use actix_web::web::{Json, Query};
 use uuid::Uuid;
 
-use error::error::Errors;
-use error::error::StateCode::{DBError, NotFound};
-use error::error::StateCode::PaginationError;
+use error::error::{ErrorCodesWrapper, ServerErrorResponse};
 use yugabyte::db_connection::{CoreDBPool, pgdata_to_pgconnection};
-use yugabyte::engine::auth_user::{count_auth_users, delete_all_auth_users, delete_auth_user_by_id, find_auth_user_by_id, insert_bulk_auth_users, list_all_auth_users};
+use yugabyte::engine::auth_user::{
+    count_auth_users, delete_all_auth_users, delete_auth_user_by_id, find_auth_user_by_id, insert_bulk_auth_users,
+    list_all_auth_users
+};
 use yugabyte::engine::member::delete_all_members;
 use yugabyte::model::auth_user::AuthUser;
 use yugabyte::model::dto::{PaginatedResponseDTO, PaginationDTO, SuccessResponse};
 use yugabyte::model::user::NewUser;
 
-#[api_v2_operation]
-pub(crate) fn list_auth_users_api(
+pub(crate) async fn list_auth_users_api(
     Query(pagination_dto): Query<PaginationDTO>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<PaginatedResponseDTO<AuthUser>>>, Errors> {
+) -> Result<Json<SuccessResponse<PaginatedResponseDTO<AuthUser>>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data.
     let pg_connection = pgdata_to_pgconnection(pool);
 
@@ -40,22 +37,17 @@ pub(crate) fn list_auth_users_api(
                         data: response,
                     }))
                 }
-                Err(_) => {
-                    Err(Errors::BadRequest(PaginationError.into()))
-                }
+                Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
             }
         }
-        Err(_) => {
-            Err(Errors::InternalServerError(DBError.into()))
-        }
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 
-#[api_v2_operation]
-pub(crate) fn insert_auth_user_api(
+pub(crate) async fn insert_auth_user_api(
     new_user: Json<NewUser>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<AuthUser>>, Errors> {
+) -> Result<Json<SuccessResponse<AuthUser>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data.
     let pg_connection = pgdata_to_pgconnection(pool);
 
@@ -66,21 +58,20 @@ pub(crate) fn insert_auth_user_api(
             message: format!("Successfully added the new Auth User."),
             data: inserted_auth_user,
         })),
-        Err(_) => Err(Errors::InternalServerError(DBError.into()))
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 
-#[api_v2_operation]
-pub async fn remove_auth_user_api(
+pub(crate) async fn remove_auth_user_api(
     auth_user_id: web::Path<Uuid>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<bool>>, Errors> {
+) -> Result<Json<SuccessResponse<bool>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data
     let pg_connection = pgdata_to_pgconnection(pool);
 
     // Step 2: Delete the auth_user from the database.
-    if !delete_auth_user_by_id(&auth_user_id, &pg_connection) {
-        Err(Errors::InternalServerError(DBError.into()))
+    if !delete_auth_user_by_id(&auth_user_id.into_inner(), &pg_connection) {
+        Err(ServerErrorResponse::from(ErrorCodesWrapper::from("db-error").get_error_codes()))
     } else {
         // Step 3: Fire the response.
         Ok(Json(SuccessResponse {
@@ -90,10 +81,9 @@ pub async fn remove_auth_user_api(
     }
 }
 
-#[api_v2_operation]
-pub async fn remove_all_auth_users_api(
+pub(crate) async fn remove_all_auth_users_api(
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<bool>>, Errors> {
+) -> Result<Json<SuccessResponse<bool>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data
     let pg_connection = pgdata_to_pgconnection(pool);
 
@@ -110,25 +100,24 @@ pub async fn remove_all_auth_users_api(
             } else {
                 // Step 3: In case an error happened while deleting members users, and teams, I will insert the deleted auth users again.
                 match insert_bulk_auth_users(&deleted_auth_users, &pg_connection) {
-                    Ok(_) => Err(Errors::InternalServerError(DBError.into())),
-                    Err(_) => Err(Errors::InternalServerError(DBError.into()))
+                    Ok(_) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from("db-error").get_error_codes())),
+                    Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
                 }
             }
         }
-        Err(_) => Err(Errors::InternalServerError(DBError.into()))
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 
-#[api_v2_operation]
-pub async fn find_auth_user_by_id_api(
+pub(crate) async fn find_auth_user_by_id_api(
     auth_user_id: web::Path<Uuid>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<AuthUser>>, Errors> {
+) -> Result<Json<SuccessResponse<AuthUser>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data
     let pg_connection = pgdata_to_pgconnection(pool);
 
     // Step 2: Find the auth_user from the database.
-    match find_auth_user_by_id(&auth_user_id, &pg_connection) {
+    match find_auth_user_by_id(&auth_user_id.into_inner(), &pg_connection) {
         Ok(found_auth_user) => {
             // Step 3: Fire the response
             Ok(Json(SuccessResponse {
@@ -136,7 +125,7 @@ pub async fn find_auth_user_by_id_api(
                 data: found_auth_user,
             }))
         }
-        Err(_) => Err(Errors::NotFound(NotFound.into()))
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 

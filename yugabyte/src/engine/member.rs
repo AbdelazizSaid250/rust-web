@@ -4,7 +4,7 @@ use uuid::Uuid;
 use error::error::Error;
 
 use crate::model::dto::PaginationDTO;
-use crate::model::member::{Member, Name, NewMember};
+use crate::model::member::{Member, Name, NewMember, UpdateMember};
 use crate::schema::member::dsl::{expired_at, identity_num, member, modification_date, name, role};
 use crate::schema::member::dsl::id as member_id;
 use crate::util::utils::current_timestamp;
@@ -85,7 +85,7 @@ pub fn find_member_by_id(
 }
 
 pub fn update_member(
-    incoming_member: &Member,
+    incoming_member: &UpdateMember,
     connection: &PgConnection,
 ) -> Result<Member, Error> {
     diesel::update(member.find(&incoming_member.id))

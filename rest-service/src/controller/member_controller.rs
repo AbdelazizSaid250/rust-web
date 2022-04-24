@@ -1,30 +1,26 @@
-use actix_web::web::Path;
-use paperclip::actix::{
-    api_v2_operation,
-    web::{self, Query},
-};
-use paperclip::actix::web::Json;
+use actix_web::web;
+use actix_web::web::{Json, Path, Query};
 use uuid::Uuid;
 
-use error::error::Errors;
-use error::error::StateCode::{DBError, NotFound, PaginationError};
+use error::error::{ErrorCodesWrapper, ServerErrorResponse};
 use yugabyte::db_connection::{CoreDBPool, pgdata_to_pgconnection};
-use yugabyte::engine::member::{count_members, delete_all_members, delete_member_by_id, filter_members_by_name, find_member_by_id, get_all_member_names_by_team_id, insert_bulk_members, list_all_members};
+use yugabyte::engine::member::{count_members, delete_all_members, delete_member_by_id, filter_members_by_name,
+                               find_member_by_id, get_all_member_names_by_team_id, insert_bulk_members, list_all_members
+};
 use yugabyte::engine::user::find_user_by_id;
 use yugabyte::model::dto::{MemberEmail, MemberInfo, MemberName, PaginatedResponseDTO, PaginationDTO, SuccessResponse};
 use yugabyte::model::member::{Member, Name, NewMember};
 use yugabyte::util::utils::current_timestamp;
 
-#[api_v2_operation]
-pub async fn find_member_email_api(
+pub(crate) async fn find_member_email_api(
     user_id: web::Path<Uuid>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<MemberEmail>>, Errors> {
+) -> Result<Json<SuccessResponse<MemberEmail>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data
     let pg_connection = pgdata_to_pgconnection(pool);
 
     // Step 2: Find the user from the database.
-    match find_user_by_id(&user_id, &pg_connection) {
+    match find_user_by_id(&user_id.into_inner(), &pg_connection) {
         Ok(found_user) => {
             let member_email = MemberEmail {
                 name: found_user.name,
@@ -36,15 +32,16 @@ pub async fn find_member_email_api(
                 data: member_email,
             }))
         }
-        Err(_) => Err(Errors::NotFound(NotFound.into()))
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 
-#[api_v2_operation]
-pub async fn find_member_info_api(
-    web::Path((user_id, member_id)): web::Path<(Uuid, Uuid)>,
+pub(crate) async fn find_member_info_api(
+    path: web::Path<(Uuid, Uuid)>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<MemberInfo>>, Errors> {
+) -> Result<Json<SuccessResponse<MemberInfo>>, ServerErrorResponse> {
+    let (user_id, member_id) = path.into_inner();
+
     // Step 1: Get the connection from pool data
     let pg_connection = pgdata_to_pgconnection(pool);
 
@@ -66,18 +63,17 @@ pub async fn find_member_info_api(
                         data: member_info,
                     }))
                 }
-                Err(_) => Err(Errors::NotFound(NotFound.into()))
+                Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
             }
         }
-        Err(_) => Err(Errors::NotFound(NotFound.into()))
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 
-#[api_v2_operation]
-pub(crate) fn list_members_api(
+pub(crate) async fn list_members_api(
     Query(pagination_dto): Query<PaginationDTO>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<PaginatedResponseDTO<Member>>>, Errors> {
+) -> Result<Json<SuccessResponse<PaginatedResponseDTO<Member>>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data.
     let pg_connection = pgdata_to_pgconnection(pool);
 
@@ -98,22 +94,17 @@ pub(crate) fn list_members_api(
                         data: response,
                     }))
                 }
-                Err(_) => {
-                    Err(Errors::BadRequest(PaginationError.into()))
-                }
+                Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
             }
         }
-        Err(_) => {
-            Err(Errors::InternalServerError(DBError.into()))
-        }
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 
-#[api_v2_operation]
-pub(crate) fn insert_member_api(
+pub(crate) async fn insert_member_api(
     new_member: Json<NewMember>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<Member>>, Errors> {
+) -> Result<Json<SuccessResponse<Member>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data.
     let pg_connection = pgdata_to_pgconnection(pool);
 
@@ -124,15 +115,14 @@ pub(crate) fn insert_member_api(
             message: format!("Successfully added the new Member."),
             data: inserted_member,
         })),
-        Err(_) => Err(Errors::InternalServerError(DBError.into()))
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 
-#[api_v2_operation]
-pub(crate) fn insert_bulk_members_api(
+pub(crate) async fn insert_bulk_members_api(
     new_members: Json<Vec<NewMember>>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<Vec<Member>>>, Errors> {
+) -> Result<Json<SuccessResponse<Vec<Member>>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data.
     let pg_connection = pgdata_to_pgconnection(pool);
     let mut members = Vec::new();
@@ -176,21 +166,20 @@ pub(crate) fn insert_bulk_members_api(
             message: format!("Successfully added the bulk of Members."),
             data: inserted_members,
         })),
-        Err(_) => Err(Errors::InternalServerError(DBError.into()))
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 
-#[api_v2_operation]
-pub async fn remove_member_api(
+pub(crate) async fn remove_member_api(
     member_id: web::Path<Uuid>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<bool>>, Errors> {
+) -> Result<Json<SuccessResponse<bool>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data
     let pg_connection = pgdata_to_pgconnection(pool);
 
     // Step 2: Delete the member from the database.
-    if !delete_member_by_id(&member_id, &pg_connection) {
-        Err(Errors::InternalServerError(DBError.into()))
+    if !delete_member_by_id(&member_id.into_inner(), &pg_connection) {
+        Err(ServerErrorResponse::from(ErrorCodesWrapper::from("db-error").get_error_codes()))
     } else {
         // Step 3: Fire the response.
         Ok(Json(SuccessResponse {
@@ -200,10 +189,9 @@ pub async fn remove_member_api(
     }
 }
 
-#[api_v2_operation]
-pub async fn remove_all_members_api(
+pub(crate) async fn remove_all_members_api(
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<bool>>, Errors> {
+) -> Result<Json<SuccessResponse<bool>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data
     let pg_connection = pgdata_to_pgconnection(pool);
 
@@ -215,15 +203,14 @@ pub async fn remove_all_members_api(
             data: true,
         }))
     } else {
-        Err(Errors::InternalServerError(DBError.into()))
+        Err(ServerErrorResponse::from(ErrorCodesWrapper::from("db-error").get_error_codes()))
     }
 }
 
-#[api_v2_operation]
-pub async fn filter_members_by_name_api(
+pub(crate) async fn filter_members_by_name_api(
     other_name: Json<MemberName>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<Vec<Member>>>, Errors> {
+) -> Result<Json<SuccessResponse<Vec<Member>>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data
     let pg_connection = pgdata_to_pgconnection(pool);
 
@@ -234,26 +221,25 @@ pub async fn filter_members_by_name_api(
             message: format!("Successfully retrieved the filtered members."),
             data: filtered_members,
         })),
-        Err(_) => Err(Errors::InternalServerError(DBError.into()))
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 
-#[api_v2_operation]
-pub async fn get_all_member_names_related_to_team_api(
+pub(crate) async fn get_all_member_names_related_to_team_api(
     team_id: Path<Uuid>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<Vec<Name>>>, Errors> {
+) -> Result<Json<SuccessResponse<Vec<Name>>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data
     let pg_connection = pgdata_to_pgconnection(pool);
 
     // Step 2: Filter member names related to the required team.
-    match get_all_member_names_by_team_id(&team_id, &pg_connection) {
+    match get_all_member_names_by_team_id(&team_id.into_inner(), &pg_connection) {
         // Step 3: Fire the response.
         Ok(member_names) => Ok(Json(SuccessResponse {
             message: format!("Successfully retrieved all member names."),
             data: member_names,
         })),
-        Err(_) => Err(Errors::InternalServerError(DBError.into()))
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 

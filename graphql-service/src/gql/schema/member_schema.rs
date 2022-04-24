@@ -1,4 +1,5 @@
 use diesel::PgConnection;
+use juniper::{EmptySubscription, RootNode};
 use uuid::Uuid;
 
 use error::error::Error;
@@ -8,14 +9,12 @@ use yugabyte::engine::member::{
     insert_bulk_members, list_all_members, update_member,
 };
 use yugabyte::model::dto::PaginationDTO;
-use yugabyte::model::member::{Member, Name, NewMember};
+use yugabyte::model::member::{Member, Name, NewMember, UpdateMember};
 use yugabyte::util::utils::current_timestamp;
-use juniper::{RootNode, EmptySubscription};
-
 
 pub struct Query;
 
-#[juniper::graphql_object(Context = GraphQLContext)]
+#[juniper::graphql_object(context = GraphQLContext)]
 impl Query {
     pub fn list_members(pagination_dto: PaginationDTO, context: &GraphQLContext) -> Result<Vec<Member>, Error> {
         let pg_connection: &PgConnection = &context.pool.get().unwrap();
@@ -47,7 +46,7 @@ impl Query {
 
 pub struct Mutation;
 
-#[juniper::object(Context = GraphQLContext)]
+#[juniper::graphql_object(context = GraphQLContext)]
 impl Mutation {
     pub fn create_member(
         context: &GraphQLContext,
@@ -87,7 +86,7 @@ impl Mutation {
 
     pub fn update_one_member(
         context: &GraphQLContext,
-        member: Member,
+        member: UpdateMember,
     ) -> Result<Member, Error> {
         let pg_connection: &PgConnection = &context.pool.get().unwrap();
 

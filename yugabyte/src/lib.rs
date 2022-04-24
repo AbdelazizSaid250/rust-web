@@ -10,6 +10,8 @@ pub mod context;
 extern crate diesel;
 extern crate diesel_migrations;
 
+extern crate juniper;
+
 #[cfg(test)]
 mod tests {
     #[test]

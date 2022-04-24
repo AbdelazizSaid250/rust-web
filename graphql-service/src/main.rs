@@ -1,30 +1,33 @@
-use std::env;
+use std::io;
 
-use actix_web::{App, HttpServer};
-use actix_web::middleware::Logger;
+use actix_web::{App, HttpServer, middleware};
 use actix_web::web::{Data, JsonConfig};
 
 use yugabyte::db_connection::CoreDBPool;
 
-use crate::gql::{routes, start_tracing};
+use crate::gql::{logging_setup, routes};
 
 mod gql;
 
-#[actix_web::main]
-async fn main() -> std::io::Result<()> {
-    start_tracing();
-    let core_db_pool_data = Data::new(CoreDBPool::default());
-    dotenv::dotenv().expect("Failed to read .env file");
+#[actix_rt::main]
+async fn main() -> io::Result<()> {
 
+    logging_setup();
+
+    // Instantiate a new connection pool
+    let core_db_pool_data = Data::new(CoreDBPool::default().0);
+
+    // Start up the server, passing in (a) the connection pool
+    // to make it available to all endpoints and (b) the configuration
+    // function that adds the /graphql logic.
     HttpServer::new(move || {
         App::new()
-            .wrap(Logger::default())
-            .data(JsonConfig::default().limit(4096))
+            .app_data(Data::new(JsonConfig::default().limit(4096)))
             .app_data(core_db_pool_data.clone())
+            .wrap(middleware::Logger::default())
             .configure(routes)
     })
-        .bind(format!("{}:{}", env::var("HOST").unwrap(), env::var("GRAPHQL_PORT").unwrap()))
-        .expect("Server binding exception")
+        .bind("127.0.0.1:3001")?
         .run()
         .await
 }
