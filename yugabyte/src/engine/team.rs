@@ -37,8 +37,8 @@ pub fn list_all_teams(
     connection: &PgConnection,
 ) -> Result<Vec<Team>, Error> {
     team
-        .limit(pagination_dto.page_size)
-        .offset(pagination_dto.offset)
+        .limit(pagination_dto.page_size as i64)
+        .offset(pagination_dto.offset as i64)
         .load::<Team>(connection)
         .map_err(|err| Error::DBError(err))
 }

@@ -1,104 +1,24 @@
 use std::fmt::{Display, Formatter};
-use std::fmt;
 
-use actix_web::ResponseError;
+use actix_web::{HttpResponse, ResponseError};
 use diesel::result::Error as DieselError;
-use paperclip::actix::web::HttpResponse;
+use juniper::{ScalarValue, FieldError, IntoFieldError, graphql_value};
 use serde::{Deserialize, Serialize};
 use validator::{ValidationErrors, ValidationErrorsKind};
 
 #[derive(Debug)]
-pub enum Errors {
+pub enum ServerErrorResponse {
+    InternalServerError(Vec<ErrorCode>),
     BadReq(Vec<ErrorCode>),
-    BadRequest(ErrorCode),
-    InternalServerError(ErrorCode),
     NotFound(ErrorCode),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct ErrorCode {
-    pub error_code: String,
-    pub message: String,
-}
-
-impl ErrorCode {
-    pub fn validate_errors(error: ValidationErrors, errors: &mut Vec<ErrorCode>) {
-        for value in error.errors().values() {
-            match value {
-                ValidationErrorsKind::Struct(_) => {}
-                ValidationErrorsKind::List(_) => {}
-                ValidationErrorsKind::Field(validation_error_vec) => {
-                    for validation_error in validation_error_vec {
-                        let error_code = validation_error.clone().code.to_string();
-                        let message = validation_error
-                            .clone()
-                            .message
-                            .expect("Validation Error")
-                            .to_string();
-                        errors.push(ErrorCode {
-                            error_code,
-                            message,
-                        });
-                    }
-                }
-            }
-        }
-    }
-}
-
-impl Display for Errors {
-    fn fmt(&self, _f: &mut Formatter<'_>) -> std::fmt::Result {
-        unimplemented!()
-    }
-}
-
-impl ResponseError for Errors {
+impl ResponseError for ServerErrorResponse {
     fn error_response(&self) -> HttpResponse {
         match self {
-            Errors::BadReq(errors) => HttpResponse::BadRequest().json(errors),
-            Errors::BadRequest(error) => HttpResponse::BadRequest().json(error),
-            Errors::NotFound(errors) => HttpResponse::NotFound().json(errors),
-            Errors::InternalServerError(errors) => HttpResponse::InternalServerError().json(errors),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub enum StateCode {
-    InternalServerError,
-    NotFound,
-    DBError,
-    PaginationError,
-    DuplicationError,
-}
-
-impl StateCode {
-    pub fn get_code(&self) -> &'static str {
-        match self {
-            Self::InternalServerError => "internal-server-error",
-            Self::NotFound => "not-found",
-            Self::DBError => "db-error",
-            Self::PaginationError => "pagination-error",
-            Self::DuplicationError => "duplication-error",
-        }
-    }
-    pub fn get_message(&self) -> &'static str {
-        match self {
-            Self::InternalServerError => "Internal server error",
-            Self::NotFound => "Cannot find the object in the Server.",
-            Self::DBError => "There is an error in dealing with Database.",
-            Self::PaginationError => "Paginated Data is not valid.",
-            Self::DuplicationError => "The object is duplicated.",
-        }
-    }
-}
-
-impl From<StateCode> for ErrorCode {
-    fn from(item: StateCode) -> Self {
-        Self {
-            error_code: item.get_code().to_string(),
-            message: item.get_message().to_string(),
+            ServerErrorResponse::InternalServerError(errors) => HttpResponse::InternalServerError().json(errors),
+            ServerErrorResponse::BadReq(errors) => HttpResponse::BadRequest().json(errors),
+            ServerErrorResponse::NotFound(errors) => HttpResponse::NotFound().json(errors),
         }
     }
 }
@@ -114,28 +34,124 @@ pub enum Error {
     DeletedDuplicationError,
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::DBError(error) => write!(f, "{}", error),
-            Error::BadRequest(error) => write!(f, "{}", error),
-            Error::InternalServerError(error) => write!(f, "{}", error),
-            Error::NotFound(error) => write!(f, "{}", error),
-            Error::HttpRequest(error) => write!(f, "{}", error),
-            Error::DuplicationError => write!(f, "The object is duplicated"),
-            Error::DeletedDuplicationError => write!(f, "The deleted object is duplicated."),
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorCode {
+    pub code: String,
+}
+
+impl ErrorCode {
+    pub fn validate_errors(error: ValidationErrors, errors: &mut Vec<ErrorCode>) {
+        for value in error.errors().values() {
+            match value {
+                ValidationErrorsKind::Struct(_) => {}
+                ValidationErrorsKind::List(_) => {}
+                ValidationErrorsKind::Field(validation_error_vec) => {
+                    for validation_error in validation_error_vec {
+                        let code = validation_error.clone().code.to_string();
+                        let _message = validation_error
+                            .clone()
+                            .message
+                            .expect("Validation Error")
+                            .to_string();
+                        errors.push(ErrorCode {
+                            code,
+                        });
+                    }
+                }
+            }
         }
     }
 }
 
-impl From<DieselError> for Error {
-    fn from(err: DieselError) -> Self {
-        Error::DBError(err)
+pub struct ErrorCodesWrapper {
+    error_codes: Vec<ErrorCode>,
+}
+
+impl ErrorCodesWrapper {
+    pub fn get_error_codes(&self) -> Vec<ErrorCode> {
+        self.error_codes.clone()
     }
 }
 
-impl From<String> for Error {
-    fn from(req: String) -> Self {
-        Error::HttpRequest(req)
+
+impl From<DieselError> for Error {
+    fn from(err: DieselError) -> Self {
+        Self::DBError(err)
+    }
+}
+
+impl From<Error> for ErrorCodesWrapper {
+    fn from(err: Error) -> Self {
+        match err {
+            Error::DBError(diesel_error) => {
+                match diesel_error {
+                    DieselError::InvalidCString(nul_error) => Self::from(format!("invalid-CString {}.", nul_error).as_str()),
+                    DieselError::DatabaseError(_, _) => Self::from("database-error"),
+                    DieselError::NotFound => Self::from("object-not-found"),
+                    DieselError::QueryBuilderError(err) => Self::from(format!("query-builder-error {}.", err).as_str()),
+                    DieselError::DeserializationError(err) => Self::from(format!("deserialization-error {}.", err).as_str()),
+                    DieselError::SerializationError(err) => Self::from(format!("serialization-error {}.", err).as_str()),
+                    DieselError::RollbackTransaction => Self::from("rollback-transaction."),
+                    DieselError::AlreadyInTransaction => Self::from("already-in-transaction."),
+                    DieselError::__Nonexhaustive => Self::from("non-exhaustive."),
+                }
+            }
+            Error::BadRequest(error) => Self::from(error.as_str()),
+            Error::InternalServerError(error) => Self::from(error.as_str()),
+            Error::NotFound(error) => Self::from(error.as_str()),
+            Error::HttpRequest(error) => Self::from(error.as_str()),
+            Error::DuplicationError => Self::from("duplication-error"),
+            Error::DeletedDuplicationError => Self::from("deleted-duplication-error"),
+        }
+    }
+}
+
+impl From<&str> for ErrorCodesWrapper {
+    fn from(str: &str) -> Self {
+        Self { error_codes: vec![ErrorCode { code: str.to_string() }] }
+    }
+}
+
+impl From<Vec<ErrorCode>> for ServerErrorResponse {
+    fn from(error_codes: Vec<ErrorCode>) -> Self {
+        Self::InternalServerError(error_codes)
+    }
+}
+
+
+impl Display for ServerErrorResponse {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ServerErrorResponse::InternalServerError(_) => write!(f, "Internal Server Error Display."),
+            ServerErrorResponse::BadReq(_) => write!(f, "Bas Request Display."),
+            ServerErrorResponse::NotFound(_) => write!(f, "Not Found Display."),
+        }
+    }
+}
+
+impl<S: ScalarValue> IntoFieldError<S> for Error {
+    fn into_field_error(self) -> FieldError<S> {
+        match self {
+            Error::DBError(diesel_error) => {
+                match diesel_error {
+                    DieselError::InvalidCString(_) => FieldError::new("gql_diesel_error", graphql_value!({ "type": "InvalidCString"})),
+                    DieselError::DatabaseError(_, _) => FieldError::new("gql_diesel_error", graphql_value!({ "type": "DatabaseError"})),
+                    DieselError::NotFound => FieldError::new("gql_diesel_error", graphql_value!({ "type": "NotFound"})),
+                    DieselError::QueryBuilderError(_) => FieldError::new("gql_diesel_error", graphql_value!({ "type": "QueryBuilderError"})),
+                    DieselError::DeserializationError(_) => FieldError::new("gql_diesel_error", graphql_value!({ "type": "DeserializationError"})),
+                    DieselError::SerializationError(_) => FieldError::new("gql_diesel_error", graphql_value!({ "type": "SerializationError"})),
+                    DieselError::RollbackTransaction => FieldError::new("gql_diesel_error", graphql_value!({ "type": "RollbackTransaction"})),
+                    DieselError::AlreadyInTransaction => FieldError::new("gql_diesel_error", graphql_value!({ "type": "AlreadyInTransaction"})),
+                    DieselError::__Nonexhaustive => FieldError::new("gql_diesel_error", graphql_value!({ "type": "__Nonexhaustive"})),
+                }
+            }
+            Error::BadRequest(_) => FieldError::new("gql_bad_request", graphql_value!({ "type": "BadRequest" })),
+            Error::InternalServerError(_) => FieldError::new("gql_bad_request", graphql_value!({ "type": "InternalServerError" })),
+            Error::NotFound(_) => FieldError::new("gql_bad_request", graphql_value!({ "type": "NotFound" })),
+            Error::HttpRequest(_) => FieldError::new("gql_bad_request", graphql_value!({ "type": "HttpRequest" })),
+            Error::DuplicationError => FieldError::new("gql_bad_request", graphql_value!({ "type": "DuplicationError" })),
+            Error::DeletedDuplicationError => FieldError::new("gql_bad_request", graphql_value!({ "type": "DeletedDuplicationError" })),
+        }
     }
 }

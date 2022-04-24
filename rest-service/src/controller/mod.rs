@@ -1,7 +1,6 @@
-use actix_web::HttpResponse;
+use actix_web::{HttpResponse, web};
+use actix_web::web::ServiceConfig;
 use dotenv::dotenv;
-use paperclip::actix::web;
-use paperclip::actix::web::{post, resource, ServiceConfig};
 use tracing_subscriber::EnvFilter;
 
 use crate::controller::auth_user_controller::{
@@ -26,7 +25,7 @@ pub(crate) mod user_controller;
 
 pub fn routes(config: &mut ServiceConfig) {
     config
-        .route("/health", web::get().to(|| HttpResponse::Ok().json("Hello World!!")))
+        .route("/health", web::get().to(|| async { HttpResponse::Ok().json("Hello World!!") }))
         .service(
             web::scope("/auth_user")
                 .route("/list_paginated", web::get().to(list_auth_users_api))

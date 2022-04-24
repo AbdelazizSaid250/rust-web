@@ -1,22 +1,17 @@
-use paperclip::actix::{
-    api_v2_operation,
-    web::{self, Query},
-};
-use paperclip::actix::web::Json;
+use actix_web::web;
+use actix_web::web::{Json, Query};
 use uuid::Uuid;
 
-use error::error::Errors;
-use error::error::StateCode::{DBError, NotFound, PaginationError};
+use error::error::{ErrorCodesWrapper, ServerErrorResponse};
 use yugabyte::db_connection::{CoreDBPool, pgdata_to_pgconnection};
 use yugabyte::engine::team::{count_teams, delete_all_teams, delete_team_by_id, find_team_by_id, insert_bulk_team, list_all_teams};
 use yugabyte::model::dto::{PaginatedResponseDTO, PaginationDTO, SuccessResponse};
 use yugabyte::model::team::{NewTeam, Team};
 
-#[api_v2_operation]
-pub(crate) fn list_teams_api(
+pub(crate) async fn list_teams_api(
     Query(pagination_dto): Query<PaginationDTO>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<PaginatedResponseDTO<Team>>>, Errors> {
+) -> Result<Json<SuccessResponse<PaginatedResponseDTO<Team>>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data.
     let pg_connection = pgdata_to_pgconnection(pool);
 
@@ -36,22 +31,17 @@ pub(crate) fn list_teams_api(
                         data: response,
                     }))
                 }
-                Err(_) => {
-                    Err(Errors::BadRequest(PaginationError.into()))
-                }
+                Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
             }
         }
-        Err(_) => {
-            Err(Errors::InternalServerError(DBError.into()))
-        }
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 
-#[api_v2_operation]
-pub(crate) fn insert_team_api(
+pub(crate) async fn insert_team_api(
     new_team: Json<NewTeam>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<Team>>, Errors> {
+) -> Result<Json<SuccessResponse<Team>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data.
     let pg_connection = pgdata_to_pgconnection(pool);
 
@@ -62,15 +52,14 @@ pub(crate) fn insert_team_api(
             message: format!("Successfully added the new Team."),
             data: inserted_team,
         })),
-        Err(_) => Err(Errors::InternalServerError(DBError.into()))
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 
-#[api_v2_operation]
-pub(crate) fn insert_bulk_teams_api(
+pub(crate) async fn insert_bulk_teams_api(
     new_teams: Json<Vec<NewTeam>>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<Vec<Team>>>, Errors> {
+) -> Result<Json<SuccessResponse<Vec<Team>>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data.
     let pg_connection = pgdata_to_pgconnection(pool);
     let mut teams = Vec::new();
@@ -103,21 +92,20 @@ pub(crate) fn insert_bulk_teams_api(
             message: format!("Successfully added the bulk of Teams."),
             data: inserted_teams,
         })),
-        Err(_) => Err(Errors::InternalServerError(DBError.into()))
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }
 
-#[api_v2_operation]
-pub async fn remove_team_api(
+pub(crate) async fn remove_team_api(
     team_id: web::Path<Uuid>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<bool>>, Errors> {
+) -> Result<Json<SuccessResponse<bool>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data
     let pg_connection = pgdata_to_pgconnection(pool);
 
     // Step 2: Delete the team from the database.
-    if !delete_team_by_id(&team_id, &pg_connection) {
-        Err(Errors::InternalServerError(DBError.into()))
+    if !delete_team_by_id(&team_id.into_inner(), &pg_connection) {
+        Err(ServerErrorResponse::from(ErrorCodesWrapper::from("db-error").get_error_codes()))
     } else {
         // Step 3: Fire the response.
         Ok(Json(SuccessResponse {
@@ -127,10 +115,9 @@ pub async fn remove_team_api(
     }
 }
 
-#[api_v2_operation]
-pub async fn remove_all_teams_api(
+pub(crate) async fn remove_all_teams_api(
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<bool>>, Errors> {
+) -> Result<Json<SuccessResponse<bool>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data
     let pg_connection = pgdata_to_pgconnection(pool);
 
@@ -142,20 +129,19 @@ pub async fn remove_all_teams_api(
             data: true,
         }))
     } else {
-        Err(Errors::InternalServerError(DBError.into()))
+        Err(ServerErrorResponse::from(ErrorCodesWrapper::from("db-error").get_error_codes()))
     }
 }
 
-#[api_v2_operation]
-pub async fn find_team_by_id_api(
+pub(crate) async fn find_team_by_id_api(
     team_id: web::Path<Uuid>,
     pool: web::Data<CoreDBPool>,
-) -> Result<Json<SuccessResponse<Team>>, Errors> {
+) -> Result<Json<SuccessResponse<Team>>, ServerErrorResponse> {
     // Step 1: Get the connection from pool data
     let pg_connection = pgdata_to_pgconnection(pool);
 
     // Step 2: Find the team from the database.
-    match find_team_by_id(&team_id, &pg_connection) {
+    match find_team_by_id(&team_id.into_inner(), &pg_connection) {
         Ok(found_team) => {
             // Step 3: Fire the response
             Ok(Json(SuccessResponse {
@@ -163,6 +149,6 @@ pub async fn find_team_by_id_api(
                 data: found_team,
             }))
         }
-        Err(_) => Err(Errors::NotFound(NotFound.into()))
+        Err(err) => Err(ServerErrorResponse::from(ErrorCodesWrapper::from(err).get_error_codes())),
     }
 }

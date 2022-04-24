@@ -1,11 +1,11 @@
 use diesel::{Insertable, Queryable};
-use paperclip::actix::Apiv2Schema;
+use juniper::GraphQLObject;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::schema::team;
 
-#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Clone, Apiv2Schema)]
+#[derive(Debug, Serialize, Deserialize, Queryable, Insertable, Clone, GraphQLObject)]
 #[table_name = "team"]
 pub struct Team {
     pub id: Uuid,
@@ -13,7 +13,7 @@ pub struct Team {
     pub description: String,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Apiv2Schema)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct NewTeam {
     pub name: String,
     pub description: String,

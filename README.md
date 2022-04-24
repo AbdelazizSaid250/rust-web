@@ -7,6 +7,7 @@ This is a web project using Rust, Actix-web, Yugabyte, Diesel
 
 
 ## Steps to Use the Project
+
 1. Install the docker into your machine from this site [https://docs.docker.com/engine/install/](https://docs.docker.com/engine/install/)
 2. Pull the Yugabyte container using docker by this command: ```sudo docker pull yugabytedb/yugabyte```
 3. Run the Yugabyte docker container using this command: \
@@ -16,7 +17,6 @@ This is a web project using Rust, Actix-web, Yugabyte, Diesel
 6. Run this command ```diesel setup``` to create the database in the .env file.
 7. Install the cargo-swagger into the project and use the extracted yaml file into this site [https://editor.swagger.io/](https://editor.swagger.io/) to see all endpoints with example, and the model in more details.
 8. Run the Server from the main file and try to use the endpoints from the swagger site.
-
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->

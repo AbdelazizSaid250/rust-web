@@ -1,20 +1,20 @@
 [package]
 name = "yugabyte"
 version = "0.1.0"
-authors = ["Abdelaziz Said <abdelazizsaid250@gmail.com>"]
+authors = ["Abdelazizsaid250 <abdelazizsaid250@gmail.com>"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-actix-web = "3.3"
-diesel = { version = "1.4", features = ["postgres", "r2d2", "chrono", "uuidv07"] }
+actix-web = "4.0.1"
+diesel = { version = "1.4.8", features = ["postgres", "r2d2", "chrono", "uuidv07"] }
+juniper = { version = "0.15.9", features = ["chrono"] }
 uuid = { version = "=0.8", features = ["serde", "v4"] }
 chrono = { version = "0.4", features = ["serde"] }
-paperclip = { version = "0.5.0", features = ["actix-nightly", "uuid", "chrono"] }
 toml = { version = "0.5", features = ["preserve_order"] }
 serde = { version = "1.0", features = ["derive"] }
-dotenv = "0.15"
+dotenv = "0.15.0"
 dotenv_codegen = "0.15"
 futures-util = "0.3.15"
 actix-identity = "0.3"
@@ -22,4 +22,4 @@ regex = "1"
 lazy_static = "1.4"
 validator = { version = "0.12", features = ["derive"] }
 diesel_migrations = "1.4.0"
-error = {path = "../error"}
+error = { path = "../error" }
