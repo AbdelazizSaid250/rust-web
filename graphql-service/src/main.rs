@@ -9,7 +9,7 @@ use crate::gql::{logging_setup, routes};
 
 mod gql;
 
-#[actix_rt::main]
+#[actix_web::main]
 async fn main() -> io::Result<()> {
 
     logging_setup();
